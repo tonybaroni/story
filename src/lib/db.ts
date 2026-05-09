@@ -23,6 +23,8 @@ function getDb(): Database.Database {
 
   initSchema(db)
   seedIfEmpty(db)
+  seedStudentIfEmpty(db)
+  seedNcaaRelaysCutsIfEmpty(db)
 
   global.__db = db
   return db
@@ -335,9 +337,6 @@ function seedIfEmpty(db: Database.Database): void {
   })
 
   seed()
-
-  seedStudentIfEmpty(db)
-  seedNcaaRelaysCutsIfEmpty(db)
 }
 
 function seedStudentIfEmpty(db: Database.Database): void {

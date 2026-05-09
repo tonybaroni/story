@@ -87,19 +87,18 @@ export async function POST(
 
   let response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
+    max_tokens: 2000,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
     messages,
   })
 
-  let iterations = 0
-  while (response.stop_reason === 'pause_turn' && iterations < 5) {
-    iterations++
+  // Allow one continuation if web search hit its internal limit
+  if (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content })
     response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 2000,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
       messages,
@@ -265,42 +264,28 @@ export async function POST(
 }
 
 function buildResearchPrompt(school: SchoolRow): string {
-  return `Research the following college swim program for an NCAA transfer portal athlete (women's swimmer, backstroke/freestyle specialist):
+  return `Research this college swim program. School: ${school.name}, ${school.location}${school.conference ? `, ${school.conference}` : ''}.
 
-School: ${school.name}
-Location: ${school.location}${school.conference ? `\nConference: ${school.conference}` : ''}
+Do ONE search to find: (1) head coach name, (2) whether they have a men's team (coed), (3) top SCY times for women's swimmers in 50 back, 100 back, 50 free, 100 free, 200 free events from SwimCloud or their roster.
 
-Please search for and provide:
-1. Head coach name and their LinkedIn URL (if findable)
-2. Engineering program academic ranking (US News or similar)
-3. Whether they have a men's swim team (coed program) — yes or no
-4. Whether they offer LCM (long course meters) summer training
-5. Top roster swimmers with their best SCY times for these specific events: 50 backstroke, 100 backstroke, 50 freestyle, 100 freestyle, 200 freestyle — look on SwimCloud or athletic department roster pages. List up to 5 swimmers per event.
-6. Recent NCAA championship relay appearances (last 2-3 years)
-7. Any NorCal alumni connection (California connections in coaching staff or notable alumni)
-8. A fit score from 1-10 for a backstroke/freestyle swimmer who wants engineering + coed team + LCM training + NCAA relay opportunity
-9. A brief fit summary (2-3 sentences)
-
-Return ONLY a JSON object with no other text:
 {
   "head_coach_name": "Coach Name or null",
-  "head_coach_linkedin": "https://linkedin.com/in/... or null",
-  "engineering_rank": "#42 US News 2025 or null",
-  "engineering_notes": "Brief note about program or null",
-  "alumni_notes": "NorCal or California connections or null",
-  "has_mens_team": true or false,
-  "has_lcm_summer": true or false,
-  "ncaa_relay_history": "Brief history or null",
+  "head_coach_linkedin": null,
+  "engineering_rank": null,
+  "engineering_notes": null,
+  "alumni_notes": null,
+  "has_mens_team": true,
+  "has_lcm_summer": false,
+  "ncaa_relay_history": null,
   "fit_score": 7,
-  "fit_summary": "2-3 sentence summary",
+  "fit_summary": "2 sentence summary",
   "swimmers": [
     { "swimmer_name": "Jane Smith", "event": "100_back", "time_display": "55.43" },
-    { "swimmer_name": "Jane Smith", "event": "50_back", "time_display": "26.12" },
     { "swimmer_name": "Alex Johnson", "event": "100_free", "time_display": "49.88" }
   ]
 }
 
-Event keys must use exactly: 50_back, 100_back, 50_free, 100_free, 200_free
-Times under 60 seconds: "27.45", times 60+ seconds: "1:52.34" format.`
+Event keys must be exactly: 50_back, 100_back, 50_free, 100_free, or 200_free.
+Times under 60s: "27.45" format. Times 60s+: "1:52.34" format. Up to 4 swimmers per event.`
 }
 

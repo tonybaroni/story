@@ -38,20 +38,18 @@ Only include events where you found a valid time. Times under 60 seconds should 
 
   let response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
+    max_tokens: 800,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
     messages,
   })
 
-  // web_search has an internal 10-iteration limit; pause_turn means it needs another call
-  let iterations = 0
-  while (response.stop_reason === 'pause_turn' && iterations < 3) {
-    iterations++
+  // Allow one continuation if web search hit its internal limit
+  if (response.stop_reason === 'pause_turn') {
     messages.push({ role: 'assistant', content: response.content })
     response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 800,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
       messages,

@@ -18,12 +18,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Swim Recruiting Tracker
             </Link>
           </div>
-          <Link
-            href="/schools/new"
-            className="bg-white text-blue-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition"
-          >
-            + Add School
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/student"
+              className="text-white/80 hover:text-white text-sm font-medium transition"
+            >
+              Parker&apos;s Profile
+            </Link>
+            <Link
+              href="/schools/new"
+              className="bg-white text-blue-700 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition"
+            >
+              + Add School
+            </Link>
+          </div>
         </nav>
         <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
       </body>

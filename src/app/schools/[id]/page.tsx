@@ -1,14 +1,15 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import getDb from '@/lib/db'
-import { School, Activity } from '@/lib/types'
+import { School, Activity, SchoolResearch, SchoolSwimmer, RelayProjection } from '@/lib/types'
 import StatusBadge from '@/components/StatusBadge'
 import PriorityBadge from '@/components/PriorityBadge'
 import ActivityLog from '@/components/ActivityLog'
 import DeleteButton from '@/components/DeleteButton'
+import ResearchSection from '@/components/ResearchSection'
 
 const SCHOLARSHIP_LABELS: Record<string, string> = {
-  full_ride: '🎓 Full Ride',
+  full_ride: 'Full Ride',
   partial:   'Partial Scholarship',
   none:      'No Scholarship',
   unknown:   'Unknown / TBD',
@@ -28,6 +29,14 @@ export default async function SchoolDetailPage({
   const activities = db.prepare(
     'SELECT * FROM activities WHERE school_id = ? ORDER BY date DESC, time DESC, created_at DESC'
   ).all(Number(id)) as Activity[]
+
+  const research = db.prepare('SELECT * FROM school_research WHERE school_id = ?').get(Number(id)) as SchoolResearch | undefined
+  const swimmers = db.prepare(
+    'SELECT * FROM school_swimmers WHERE school_id = ? ORDER BY event, time_seconds ASC'
+  ).all(Number(id)) as SchoolSwimmer[]
+  const projections = db.prepare(
+    'SELECT * FROM relay_projections WHERE school_id = ? ORDER BY relay_name'
+  ).all(Number(id)) as RelayProjection[]
 
   return (
     <div className="space-y-6">
@@ -66,7 +75,7 @@ export default async function SchoolDetailPage({
         <section className="bg-white rounded-xl border p-5">
           <h2 className="font-semibold text-lg mb-3">Scholarship</h2>
           <p className={`font-semibold ${school.scholarship_type === 'full_ride' ? 'text-green-700' : 'text-gray-700'}`}>
-            {SCHOLARSHIP_LABELS[school.scholarship_type]}
+            {school.scholarship_type === 'full_ride' ? '🎓 ' : ''}{SCHOLARSHIP_LABELS[school.scholarship_type]}
           </p>
           {school.scholarship_details && (
             <p className="text-sm text-gray-600 mt-2">{school.scholarship_details}</p>
@@ -96,7 +105,7 @@ export default async function SchoolDetailPage({
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-400 italic">No coach info yet — add it by editing this school.</p>
+            <p className="text-sm text-gray-400 italic">No coach info yet — add it by editing this school, or use Research This School below.</p>
           )}
         </section>
       </div>
@@ -108,6 +117,15 @@ export default async function SchoolDetailPage({
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{school.notes}</p>
         </section>
       )}
+
+      {/* AI Research + Relay Projections */}
+      <ResearchSection
+        schoolId={school.id}
+        schoolName={school.name}
+        initialResearch={research ?? null}
+        initialSwimmers={swimmers}
+        initialProjections={projections}
+      />
 
       {/* Activity Log */}
       <ActivityLog schoolId={school.id} initialActivities={activities} />

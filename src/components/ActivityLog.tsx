@@ -45,6 +45,23 @@ interface ActivityFormState {
   description: string
 }
 
+const HOUR_OPTIONS = [
+  { value: '6',  label: '6 AM'  }, { value: '7',  label: '7 AM'  },
+  { value: '8',  label: '8 AM'  }, { value: '9',  label: '9 AM'  },
+  { value: '10', label: '10 AM' }, { value: '11', label: '11 AM' },
+  { value: '12', label: '12 PM' }, { value: '13', label: '1 PM'  },
+  { value: '14', label: '2 PM'  }, { value: '15', label: '3 PM'  },
+  { value: '16', label: '4 PM'  }, { value: '17', label: '5 PM'  },
+  { value: '18', label: '6 PM'  }, { value: '19', label: '7 PM'  },
+  { value: '20', label: '8 PM'  }, { value: '21', label: '9 PM'  },
+]
+
+function parseTimeToDropdowns(time: string): { hour: string; minute: string } {
+  if (!time) return { hour: '', minute: '00' }
+  const [h, m] = time.split(':')
+  return { hour: String(parseInt(h)), minute: m ?? '00' }
+}
+
 function ActivityEntryForm({
   initial,
   onSave,
@@ -58,6 +75,21 @@ function ActivityEntryForm({
 }) {
   const [form, setForm] = useState(initial)
   const [saving, setSaving] = useState(false)
+  const [timeHour, setTimeHour] = useState(() => parseTimeToDropdowns(initial.time).hour)
+  const [timeMinute, setTimeMinute] = useState(() => parseTimeToDropdowns(initial.time).minute)
+
+  function updateHour(h: string) {
+    setTimeHour(h)
+    const newTime = h ? `${h.padStart(2, '0')}:${timeMinute}` : ''
+    setForm(f => ({ ...f, time: newTime }))
+  }
+
+  function updateMinute(m: string) {
+    setTimeMinute(m)
+    if (timeHour) {
+      setForm(f => ({ ...f, time: `${timeHour.padStart(2, '0')}:${m}` }))
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -92,16 +124,33 @@ function ActivityEntryForm({
         </label>
       </div>
       {showTimeField(form.activity_type) && (
-        <label className="flex flex-col gap-1 text-sm">
+        <div className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-gray-700">Time (optional)</span>
-          <input
-            type="time"
-            step="60"
-            value={form.time}
-            onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
-            className="border rounded-lg px-2 py-1.5 w-40"
-          />
-        </label>
+          <div className="flex gap-2 items-center">
+            <select
+              value={timeHour}
+              onChange={e => updateHour(e.target.value)}
+              className="border rounded-lg px-2 py-1.5 bg-white"
+            >
+              <option value="">— no time —</option>
+              {HOUR_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {timeHour && (
+              <select
+                value={timeMinute}
+                onChange={e => updateMinute(e.target.value)}
+                className="border rounded-lg px-2 py-1.5 bg-white"
+              >
+                <option value="00">:00</option>
+                <option value="15">:15</option>
+                <option value="30">:30</option>
+                <option value="45">:45</option>
+              </select>
+            )}
+          </div>
+        </div>
       )}
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium text-gray-700">Notes</span>

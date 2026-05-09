@@ -1,0 +1,178 @@
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Activity, ActivityType } from '@/lib/types'
+
+const ACTIVITY_ICONS: Record<ActivityType, string> = {
+  call:           '📞',
+  call_scheduled: '📅',
+  email:          '📧',
+  visit:          '🏫',
+  offer:          '🎉',
+  portal:         '🌀',
+  other:          '📝',
+}
+
+const ACTIVITY_LABELS: Record<ActivityType, string> = {
+  call:           'Call',
+  call_scheduled: 'Scheduled Call',
+  email:          'Email',
+  visit:          'Visit',
+  offer:          'Offer',
+  portal:         'Portal',
+  other:          'Other',
+}
+
+function formatDate(date: string, time: string | null): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  if (!time) return dateStr
+  const [h, m] = time.split(':').map(Number)
+  const ampm = h >= 12 ? 'pm' : 'am'
+  const hour = h % 12 || 12
+  return `${dateStr} at ${hour}:${m.toString().padStart(2, '0')}${ampm}`
+}
+
+export default function ActivityLog({
+  schoolId,
+  initialActivities,
+}: {
+  schoolId: number
+  initialActivities: Activity[]
+}) {
+  const router = useRouter()
+  const [activities, setActivities] = useState(initialActivities)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    time: '',
+    activity_type: 'other' as ActivityType,
+    description: '',
+  })
+
+  const showTime = form.activity_type === 'call_scheduled' || form.activity_type === 'call' || form.activity_type === 'visit'
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    const res = await fetch(`/api/schools/${schoolId}/activities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, time: form.time || null }),
+    })
+    if (res.ok) {
+      const newActivity = await res.json()
+      setActivities(prev => [newActivity, ...prev])
+      setForm(f => ({ ...f, description: '', time: '' }))
+      setAdding(false)
+      router.refresh()
+    }
+  }
+
+  async function handleDelete(activityId: number) {
+    if (!confirm('Delete this activity entry?')) return
+    await fetch(`/api/activities/${activityId}`, { method: 'DELETE' })
+    setActivities(prev => prev.filter(a => a.id !== activityId))
+    router.refresh()
+  }
+
+  return (
+    <section className="bg-white rounded-xl border p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-lg">Activity Log</h2>
+        <button
+          onClick={() => setAdding(a => !a)}
+          className="text-sm text-blue-600 hover:underline font-medium"
+        >
+          {adding ? 'Cancel' : '+ Add Entry'}
+        </button>
+      </div>
+
+      {adding && (
+        <form onSubmit={handleAdd} className="border rounded-lg p-4 mb-5 space-y-3 bg-gray-50">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Type</span>
+              <select
+                value={form.activity_type}
+                onChange={e => setForm(f => ({ ...f, activity_type: e.target.value as ActivityType }))}
+                className="border rounded-lg px-2 py-1.5 bg-white"
+              >
+                {(Object.keys(ACTIVITY_LABELS) as ActivityType[]).map(t => (
+                  <option key={t} value={t}>{ACTIVITY_LABELS[t]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Date</span>
+              <input
+                type="date"
+                value={form.date}
+                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                className="border rounded-lg px-2 py-1.5"
+              />
+            </label>
+          </div>
+          {showTime && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-gray-700">Time (optional)</span>
+              <input
+                type="time"
+                value={form.time}
+                onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
+                className="border rounded-lg px-2 py-1.5 w-40"
+              />
+            </label>
+          )}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-gray-700">Notes</span>
+            <textarea
+              value={form.description}
+              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              rows={2}
+              placeholder="What happened? What did you discuss?"
+              className="border rounded-lg px-2 py-1.5 resize-none"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!form.description.trim()}
+            className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-700"
+          >
+            Save Entry
+          </button>
+        </form>
+      )}
+
+      {activities.length === 0 ? (
+        <p className="text-sm text-gray-400 italic">No activity logged yet.</p>
+      ) : (
+        <ul className="space-y-4">
+          {activities.map(a => (
+            <li key={a.id} className="flex gap-3 items-start group">
+              <span className="text-lg mt-0.5 shrink-0">{ACTIVITY_ICONS[a.activity_type]}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${a.activity_type === 'call_scheduled' ? 'text-purple-600' : 'text-gray-500'}`}>
+                    {ACTIVITY_LABELS[a.activity_type]}
+                  </span>
+                  <span className="text-xs text-gray-400">{formatDate(a.date, a.time)}</span>
+                </div>
+                {a.description && (
+                  <p className="text-sm text-gray-700 mt-0.5">{a.description}</p>
+                )}
+              </div>
+              <button
+                onClick={() => handleDelete(a.id)}
+                className="text-gray-300 hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition shrink-0 p-1"
+                title="Delete"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}

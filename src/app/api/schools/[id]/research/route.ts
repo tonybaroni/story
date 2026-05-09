@@ -87,7 +87,7 @@ export async function POST(
 
   let response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
+    max_tokens: 3000,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
     messages,
@@ -98,7 +98,7 @@ export async function POST(
     messages.push({ role: 'assistant', content: response.content })
     response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
+      max_tokens: 3000,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: [{ type: 'web_search_20260209' as any, name: 'web_search' }],
       messages,
@@ -110,15 +110,19 @@ export async function POST(
     return NextResponse.json({ error: 'No response from AI' }, { status: 500 })
   }
 
-  const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/)
+  // Strip markdown code fences if present, then extract JSON
+  const cleaned = textBlock.text.replace(/```(?:json)?\n?/g, '').trim()
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
+    console.error('[research] No JSON found in response:', textBlock.text.slice(0, 500))
     return NextResponse.json({ error: 'Could not parse research data' }, { status: 500 })
   }
 
   let result: ResearchResult
   try {
     result = JSON.parse(jsonMatch[0])
-  } catch {
+  } catch (e) {
+    console.error('[research] JSON parse failed:', e, '\nText:', jsonMatch[0].slice(0, 500))
     return NextResponse.json({ error: 'Invalid JSON in AI response' }, { status: 500 })
   }
 
@@ -264,28 +268,36 @@ export async function POST(
 }
 
 function buildResearchPrompt(school: SchoolRow): string {
-  return `Research this college swim program. School: ${school.name}, ${school.location}${school.conference ? `, ${school.conference}` : ''}.
+  return `You are researching a college swim program. Do exactly 2 web searches total, then stop and return JSON.
 
-Do ONE search to find: (1) head coach name, (2) whether they have a men's team (coed), (3) top SCY times for women's swimmers in 50 back, 100 back, 50 free, 100 free, 200 free events from SwimCloud or their roster.
+School: ${school.name}, ${school.location}${school.conference ? `, ${school.conference}` : ''}
 
+Search 1: Find the head coach name and whether the school has a men's swim team.
+Search 2: Search SwimCloud for top women's SCY times at ${school.name} in backstroke and freestyle.
+
+After those 2 searches, immediately return ONLY this JSON with no extra text:
 {
-  "head_coach_name": "Coach Name or null",
+  "head_coach_name": null,
   "head_coach_linkedin": null,
   "engineering_rank": null,
   "engineering_notes": null,
   "alumni_notes": null,
   "has_mens_team": true,
-  "has_lcm_summer": false,
+  "has_lcm_summer": null,
   "ncaa_relay_history": null,
-  "fit_score": 7,
-  "fit_summary": "2 sentence summary",
+  "fit_score": null,
+  "fit_summary": null,
   "swimmers": [
     { "swimmer_name": "Jane Smith", "event": "100_back", "time_display": "55.43" },
     { "swimmer_name": "Alex Johnson", "event": "100_free", "time_display": "49.88" }
   ]
 }
 
-Event keys must be exactly: 50_back, 100_back, 50_free, 100_free, or 200_free.
-Times under 60s: "27.45" format. Times 60s+: "1:52.34" format. Up to 4 swimmers per event.`
+Rules:
+- swimmers event keys must be exactly one of: 50_back, 100_back, 50_free, 100_free, 200_free
+- times under 60s: "27.45" format; 60s+: "1:52.34" format
+- max 3 swimmers per event
+- use null for anything not found
+- return ONLY the JSON, nothing else`
 }
 

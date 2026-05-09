@@ -118,6 +118,7 @@ export default function ActivityLog({
               <span className="font-medium text-gray-700">Time (optional)</span>
               <input
                 type="time"
+                step="60"
                 value={form.time}
                 onChange={e => setForm(f => ({ ...f, time: e.target.value }))}
                 className="border rounded-lg px-2 py-1.5 w-40"
